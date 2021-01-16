@@ -37,7 +37,8 @@ const ChatRoom = new mongoose.Schema({
     logo: String,
     category: Array,
     startDate: String,
-    endDate: String
+    endDate: String,
+    recipients: Array
 });
 const User = mongoose.model("User", UserSchema);
 const Room = mongoose.model("Room", ChatRoom);
@@ -113,7 +114,8 @@ app.post('/makeroom', (req, res) => {
         logo: data.logo,
         category: data.category,
         startDate: data.startDate,
-        endDate: data.endDate
+        endDate: data.endDate,
+        recipients: []
     });
     newRoom.save()
         .then(
@@ -124,6 +126,27 @@ app.post('/makeroom', (req, res) => {
         )
     res.send(JSON.stringify({ roomId: data.id }));
     res.end();
+})
+
+app.post('/entrance', (req, res) => {
+    console.log("방 입장 요청이 들어왔습니다.");
+    const data = req.body;
+    console.log(data);
+
+    var Room = mongoose.model("Room", ChatRoom);
+    Room.find({ id: data.roomId }, (err, result) => {
+
+        console.log(result[0]);
+        console.log([...result[0].recipients, data.userId]);
+        console.log(!result[0].recipients.includes(data.userId))
+        if (err) throw (err);
+        if (!result[0].recipients.includes(data.userId)) {
+            Room.update({ id: data.roomId }, { recipients: [...result[0].recipients, data.userId] }, () => { });
+        } else {
+            console.log("아이디가 이미 있습니다.")
+        }
+        res.end(JSON.stringify({ token: true }));
+    })
 })
 
 
