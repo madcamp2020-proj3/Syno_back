@@ -28,21 +28,19 @@ const UserSchema = new mongoose.Schema({
     pw: String
 });
 const ChatRoom = new mongoose.Schema({
-    id: Number,
-    location: String,
-    logo: String,
-    isnew: Boolean,
-    featured: Boolean,
-    position: String,
-    postedAt: String,
+    id: String,
+    title: String,
     subtitle: String,
+    location: String,
     members: Number,
-    category: Array
+    personnel: Number,
+    logo: String,
+    category: Array,
+    startDate: String,
+    endDate: String
 });
 const User = mongoose.model("User", UserSchema);
 const Room = mongoose.model("Room", ChatRoom);
-
-
 
 app.use(cors());
 app.use(express.json())
@@ -52,6 +50,7 @@ app.get('/users', (req, res) => {
     res.send("Hello");
     res.end();
 })
+
 // Serverside for sign up
 app.post('/signup', async (req, res) => {
     console.log("회원가입 요청이 들어왔습니다.");
@@ -89,23 +88,33 @@ app.post('/login', async (req, res) => {
     });
 })
 
+// Serverside for get chat room information
+app.get('/makeroom', (req, res) => {
+    console.log("방 데이터를 요청하였습니다.")
+    var newRoom = mongoose.model("Room", ChatRoom);
+    newRoom.find({}, (err, result) => {
+        if (err) throw (err);
+        res.send(JSON.stringify(result));
+        res.end();
+    });
+})
+
 // Serverside for make chat room request
-app.post('/makeroom', async (req, res) => {
+app.post('/makeroom', (req, res) => {
     console.log("방 만들기 요청이 들어왔습니다.");
     const data = req.body;
     var newRoom = new Room({
         id: data.id,
-        location: data.location,
-        logo: data.logo,
-        isnew: data.isnew,
-        featured: data.featured,
-        position: data.position,
-        postedAt: data.postedAt,
+        title: data.title,
         subtitle: data.subtitle,
+        location: data.location,
         members: data.members,
-        category: data.category
+        personnel: data.personnel,
+        logo: data.logo,
+        category: data.category,
+        startDate: data.startDate,
+        endDate: data.endDate
     });
-
     newRoom.save()
         .then(
             console.log(newRoom)
@@ -116,6 +125,7 @@ app.post('/makeroom', async (req, res) => {
     res.send(JSON.stringify({ roomId: data.id }));
     res.end();
 })
+
 
 io.on('connection', socket => {
     console.log("연결되었습니다.");
