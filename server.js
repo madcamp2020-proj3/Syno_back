@@ -10,7 +10,6 @@ const io = require('socket.io')(server, {
 
 // Data base setting 
 const mongoose = require("mongoose");
-const { isString } = require('util');
 mongoose
     .connect("mongodb://127.0.0.1:27017/myTable", {
         useNewUrlParser: true,
@@ -28,7 +27,20 @@ const UserSchema = new mongoose.Schema({
     id: String,
     pw: String
 });
+const ChatRoom = new mongoose.Schema({
+    id: Number,
+    location: String,
+    logo: String,
+    isnew: Boolean,
+    featured: Boolean,
+    position: String,
+    postedAt: String,
+    subtitle: String,
+    members: Number,
+    category: Array
+});
 const User = mongoose.model("User", UserSchema);
+const Room = mongoose.model("Room", ChatRoom);
 
 
 
@@ -40,7 +52,7 @@ app.get('/users', (req, res) => {
     res.send("Hello");
     res.end();
 })
-// Serverside for signup
+// Serverside for sign up
 app.post('/signup', async (req, res) => {
     console.log("회원가입 요청이 들어왔습니다.");
     const data = req.body;
@@ -75,6 +87,34 @@ app.post('/login', async (req, res) => {
         res.send(jsonObj);
         res.end();
     });
+})
+
+// Serverside for make chat room request
+app.post('/makeroom', async (req, res) => {
+    console.log("방 만들기 요청이 들어왔습니다.");
+    const data = req.body;
+    var newRoom = new Room({
+        id: data.id,
+        location: data.location,
+        logo: data.logo,
+        isnew: data.isnew,
+        featured: data.featured,
+        position: data.position,
+        postedAt: data.postedAt,
+        subtitle: data.subtitle,
+        members: data.members,
+        category: data.category
+    });
+
+    newRoom.save()
+        .then(
+            console.log(newRoom)
+        )
+        .catch((err) =>
+            console.log("Error: " + err)
+        )
+    res.send(JSON.stringify({ roomId: data.id }));
+    res.end();
 })
 
 io.on('connection', socket => {
