@@ -128,6 +128,7 @@ app.post('/makeroom', (req, res) => {
     res.end();
 })
 
+// Serverside for entrance request
 app.post('/entrance', (req, res) => {
     console.log("방 입장 요청이 들어왔습니다.");
     const data = req.body;
@@ -135,20 +136,37 @@ app.post('/entrance', (req, res) => {
 
     var Room = mongoose.model("Room", ChatRoom);
     Room.find({ id: data.roomId }, (err, result) => {
-
-        console.log(result[0]);
-        console.log([...result[0].recipients, data.userId]);
-        console.log(!result[0].recipients.includes(data.userId))
         if (err) throw (err);
-        if (!result[0].recipients.includes(data.userId)) {
-            Room.update({ id: data.roomId }, { recipients: [...result[0].recipients, data.userId] }, () => { });
+        if (result[0].members <= result[0].personnel) {
+            if (!result[0].recipients.includes(data.userId)) {
+                Room.update({ id: data.roomId }, { recipients: [...result[0].recipients, data.userId], members: result[0].members + 1 }, () => {
+                    console.log(result[0].members);
+                    res.send(JSON.stringify({ recipients: [...result[0].recipients, data.userId] }));
+                    res.end();
+                });
+            } else {
+                console.log("아이디가 이미 있습니다.")
+                res.send(JSON.stringify({ recipients: result[0].recipients }));
+                res.end();
+            }
         } else {
-            console.log("아이디가 이미 있습니다.")
+            console.log("입장 인원을 초과했습니다.");
+            res.send(JSON.stringify({ token: true }));
+            res.end();
         }
-        res.end(JSON.stringify({ token: true }));
     })
 })
 
+app.get('/chatroom/:roomId', (req, res) => {
+    console.log("방 정보를 요청합니다.")
+    var Room = mongoose.model("Room", ChatRoom);
+    Room.find({ id: req.params.roomId }, (err, result) => {
+        if (err) throw (err);
+        console.log(result[0].recipients);
+        res.send(JSON.stringify({ recipients: result[0].recipients }));
+        res.end();
+    })
+})
 
 io.on('connection', socket => {
     console.log("연결되었습니다.");
