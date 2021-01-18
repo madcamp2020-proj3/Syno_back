@@ -41,8 +41,13 @@ const ChatRoom = new mongoose.Schema({
     endDate: String,
     recipients: Array
 });
+const ChatHistory = new mongoose.Schema({
+    sender: String,
+    text: String
+});
 const User = mongoose.model("User", UserSchema);
 const Room = mongoose.model("Room", ChatRoom);
+const History = mongoose.model("Chat", ChatRoom);
 
 app.use(cors());
 app.use(express.json())
@@ -227,6 +232,7 @@ io.on('connection', socket => {
 
     socket.on('send-message', ({ recipients, text }) => {
         console.log("connected");
+        // Store in DataBase
         recipients.forEach(recipient => {
             const newRecipients = recipients.filter(r => r !== recipient);
             newRecipients.push(id);
