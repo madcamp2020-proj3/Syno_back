@@ -29,6 +29,7 @@ const UserSchema = new mongoose.Schema({
 });
 const ChatRoom = new mongoose.Schema({
     id: String,
+    owner: String,
     title: String,
     subtitle: String,
     location: String,
@@ -106,16 +107,17 @@ app.post('/makeroom', (req, res) => {
     const data = req.body;
     var newRoom = new Room({
         id: data.id,
+        owner: data.owner,
         title: data.title,
         subtitle: data.subtitle,
         location: data.location,
-        members: data.members,
+        members: 1,
         personnel: data.personnel,
         logo: data.logo,
         category: data.category,
         startDate: data.startDate,
         endDate: data.endDate,
-        recipients: []
+        recipients: [data.owner]
     });
     newRoom.save()
         .then(
@@ -137,26 +139,33 @@ app.post('/entrance', (req, res) => {
     var Room = mongoose.model("Room", ChatRoom);
     Room.find({ id: data.roomId }, (err, result) => {
         if (err) throw (err);
-        if (result[0].members <= result[0].personnel) {
+        if (data.userId != null) {
+
             if (!result[0].recipients.includes(data.userId)) {
-                Room.update({ id: data.roomId }, { recipients: [...result[0].recipients, data.userId], members: result[0].members + 1 }, () => {
-                    console.log(result[0].members);
-                    res.send(JSON.stringify({ recipients: [...result[0].recipients, data.userId] }));
+                if (result[0].members < result[0].personnel) {
+                    Room.update({ id: data.roomId }, { recipients: [...result[0].recipients, data.userId], members: result[0].members + 1 }, () => {
+                        console.log(result[0].members);
+                        res.send(JSON.stringify({ recipients: [...result[0].recipients, data.userId] }));
+                        res.end();
+                    });
+                } else {
+                    console.log("입장 인원을 초과했습니다.");
+                    res.send(JSON.stringify({ token: true }));
                     res.end();
-                });
+                }
             } else {
                 console.log("아이디가 이미 있습니다.")
                 res.send(JSON.stringify({ recipients: result[0].recipients }));
                 res.end();
             }
         } else {
-            console.log("입장 인원을 초과했습니다.");
-            res.send(JSON.stringify({ token: true }));
+            console.log("올바르지 않은 아이디 값입니다.");
             res.end();
         }
     })
 })
 
+// 방 정보 요청
 app.get('/chatroom/:roomId', (req, res) => {
     console.log("방 정보를 요청합니다.")
     var Room = mongoose.model("Room", ChatRoom);
@@ -165,6 +174,49 @@ app.get('/chatroom/:roomId', (req, res) => {
         console.log(result[0].recipients);
         res.send(JSON.stringify({ recipients: result[0].recipients }));
         res.end();
+    })
+})
+
+// 방 나가기 요청
+app.get('/exit/chatroom/:roomId/:userId', (req, res) => {
+    console.log("방 나가기 요청을 합니다.");
+    var Room = mongoose.model("Room", ChatRoom);
+    Room.find({ id: req.params.roomId }, (err, result) => {
+        if (err) throw (err);
+        var idx = result[0].recipients.indexOf(req.params.userId);
+        result[0].recipients.splice(idx, 1);
+        Room.update({ id: req.params.roomId }, { recipients: result[0].recipients, members: result[0].members - 1 }, () => {
+            res.end();
+        })
+    })
+})
+
+app.get('/mypage', (req, res) => {
+    console.log("DB 자료.")
+    var Room = mongoose.model("Room", ChatRoom);
+    Room.find({}, (err, result) => {
+        if (err) throw (err);
+        res.send(JSON.stringify(result));
+        res.end();
+    })
+})
+
+app.get('/delete/chatroom/:roomId/:userId', (req, res) => {
+    console.log(req.params.roomId, req.params.userId);
+    var Room = mongoose.model("Room", ChatRoom);
+    Room.find({ id: req.params.roomId }, (err, result) => {
+        if (err) throw (err);
+        if (result[0].owner == req.params.userId) {
+            // 삭제 
+            Room.remove({ id: req.params.roomId }, (err, result) => {
+                if (err) throw (err);
+                res.send(JSON.stringify({ token: true }));
+                res.end();
+            })
+        } else {
+            res.send(JSON.stringify({ token: false }));
+            res.end();
+        }
     })
 })
 
