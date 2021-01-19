@@ -44,12 +44,20 @@ const ChatRoom = new mongoose.Schema({
     isnew: Boolean,
     startDate: String,
     endDate: String,
-    recipients: Array
+    recipients: Array,
+    memo: Array,
 });
 const ChatHistory = new mongoose.Schema({
     sender: String,
+    text: String,
+    time: String
+});
+const Memo = new mongoose.Schema({
+    id: String,
+    color: String,
     text: String
 });
+
 const User = mongoose.model("User", UserSchema);
 const Room = mongoose.model("Room", ChatRoom);
 
@@ -137,7 +145,8 @@ app.post('/makeroom', (req, res) => {
         isnew: data.isNew,
         startDate: data.startDate,
         endDate: data.endDate,
-        recipients: [data.owner]
+        recipients: [data.owner],
+        memo: data.memo
     });
     connectDB("myTable")
         .then(_ =>
@@ -162,7 +171,7 @@ app.post('/entrance', (req, res) => {
             return Room.find({ id: data.roomId }, (err, result) => {
                 if (err) throw (err);
                 if (data.userId != null && data.userId != "") {
-                    if (!result[0].recipients.includes(data.userId)) {
+                    if (result[0] != undefined && !result[0].recipients.includes(data.userId)) {
                         if (!result[0].personnel || result[0].members < result[0].personnel) {
                             Room.update({ id: data.roomId }, { recipients: [...result[0].recipients, data.userId], members: result[0].members + 1 }, () => {
                                 console.log(result[0].members);
@@ -197,8 +206,7 @@ app.get('/chatroom/:roomId', (req, res) => {
             return Room.find({ id: req.params.roomId }, (err, result) => {
                 if (err) throw (err);
                 if (result != undefined) {
-                    console.log(result[0].recipients);
-                    res.send(JSON.stringify({ recipients: result[0].recipients }));
+                    res.send(JSON.stringify(result[0]));
                     res.end();
                 }
             })
@@ -271,9 +279,11 @@ app.get('/delete/chatroom/:roomId/:userId', (req, res) => {
 app.get('/history/:roomId', (req, res) => {
     console.log("채팅 데이터 삭제 요청이 들어왔습니다.");
     connectDB("chatData")
-        .then(_ => mongoose.connection.db.dropCollection(req.params.roomId))
+        .then(_ => mongoose.connection.db.dropCollection(req.params.roomId)
+            .catch((err => console.log(err)))
+        )
         .then(_ => mongoose.connection.close())
-        .then(_ => res.end());
+        .catch(err => console.log(err));
 })
 
 app.get('/backup/:roomId', (req, res) => {
@@ -284,19 +294,55 @@ app.get('/backup/:roomId', (req, res) => {
             return history.find({}, (err, result) => {
                 if (err) throw (err);
                 var f = result.map(elem => (
-                    { sender: elem.sender, text: elem.text }));
+                    { time: elem.time, sender: elem.sender, text: elem.text }));
                 res.send(f);
                 res.end();
             });
         })
-        .then(_ => { mongoose.connection.close() });
+        .then(_ => mongoose.connection.close());
+});
+
+// add 
+app.post('/addmemo/:roomId', (req, res) => {
+    console.log("메모 추가가 완료되었습니다.");
+    const data = req.body;
+    connectDB("myTable")
+        .then(_ => {
+            var Room = mongoose.model("Room", ChatRoom);
+            return Room.find({ id: req.params.roomId }, (err, result) => {
+                if (err) throw (err);
+                return Room.update({ id: req.params.roomId }, { memo: [...result[0].memo, data] }, () => {
+                    console.log("추가 완료");
+                    res.end();
+                });
+            })
+        })
+        .then(_ => mongoose.connection.close());
+});
+
+app.post('/delmemo/:roomId', (req, res) => {
+    console.log("메모 제거 요청이 들어왔습니다.");
+    const data = req.body;
+    connectDB("myTable")
+        .then(_ => {
+            var Room = mongoose.model("Room", ChatRoom);
+            return Room.find({ id: req.params.roomId }, (err, result) => {
+                if (err) throw (err);
+                return Room.update({ id: req.params.roomId }, { memo: data }, () => {
+                    console.log("수정 완료");
+                    res.end();
+                });
+            })
+        })
+        .then(_ => mongoose.connection.close());
+    res.end();
 });
 
 io.on('connection', socket => {
     console.log("연결되었습니다.");
     const id = socket.handshake.query.id;
     socket.join(id);
-    socket.on('send-message', ({ recipients, text, parseData }) => {
+    socket.on('send-message', ({ recipients, text, parseData, time }) => {
         // Store in DataBase
         connectDB("chatData")
             .then(_ => {
@@ -304,7 +350,8 @@ io.on('connection', socket => {
                 const History = mongoose.model(parseData, ChatHistory);
                 var newHistory = new History({
                     sender: id,
-                    text: text
+                    text: text,
+                    time: time
                 });
                 return newHistory.save();
             })
@@ -314,7 +361,7 @@ io.on('connection', socket => {
             const newRecipients = recipients.filter(r => r !== recipient);
             newRecipients.push(id);
             socket.broadcast.to(recipient).emit('receive-message', {
-                recipients: newRecipients, sender: id, text
+                time: time, text: text, sender: id
             });
         })
     });
