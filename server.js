@@ -161,9 +161,9 @@ app.post('/entrance', (req, res) => {
             var Room = mongoose.model("Room", ChatRoom);
             return Room.find({ id: data.roomId }, (err, result) => {
                 if (err) throw (err);
-                if (data.userId != null) {
+                if (data.userId != null && data.userId != "") {
                     if (!result[0].recipients.includes(data.userId)) {
-                        if (result[0].members < result[0].personnel) {
+                        if (!result[0].personnel || result[0].members < result[0].personnel) {
                             Room.update({ id: data.roomId }, { recipients: [...result[0].recipients, data.userId], members: result[0].members + 1 }, () => {
                                 console.log(result[0].members);
                                 res.send(JSON.stringify({ recipients: [...result[0].recipients, data.userId] }));
@@ -196,9 +196,11 @@ app.get('/chatroom/:roomId', (req, res) => {
             var Room = mongoose.model("Room", ChatRoom);
             return Room.find({ id: req.params.roomId }, (err, result) => {
                 if (err) throw (err);
-                console.log(result[0].recipients);
-                res.send(JSON.stringify({ recipients: result[0].recipients }));
-                res.end();
+                if (result != undefined) {
+                    console.log(result[0].recipients);
+                    res.send(JSON.stringify({ recipients: result[0].recipients }));
+                    res.end();
+                }
             })
         })
         .then(_ => mongoose.connection.close());
@@ -237,27 +239,41 @@ app.get('/mypage', (req, res) => {
 })
 
 app.get('/delete/chatroom/:roomId/:userId', (req, res) => {
+    console.log("채팅방 삭제 요청이 들어왔습니다.");
     console.log(req.params.roomId, req.params.userId);
+    var token;
     connectDB("myTable")
         .then(_ => {
             var Room = mongoose.model("Room", ChatRoom);
             return Room.find({ id: req.params.roomId }, (err, result) => {
                 if (err) throw (err);
                 if (result[0].owner == req.params.userId) {
-                    // 삭제 
-                    Room.remove({ id: req.params.roomId }, (err, result) => {
+                    return Room.deleteOne({ id: req.params.roomId }, (err, result) => {
                         if (err) throw (err);
-                        // Delete chatting data
-                        res.send(JSON.stringify({ token: true }));
-                        res.end();
+                        token = JSON.stringify({ token: true });
                     })
                 } else {
-                    res.send(JSON.stringify({ token: false }));
-                    res.end();
+                    token = JSON.stringify({ token: false });
                 }
             })
         })
-        .then(_ => mongoose.connection.close());
+        .then(_ => {
+            console.log("diconnected");
+            return mongoose.connection.close();
+        })
+        .then(_ => {
+            console.log("send");
+            res.send(token);
+            res.end();
+        });
+})
+
+app.get('/history/:roomId', (req, res) => {
+    console.log("채팅 데이터 삭제 요청이 들어왔습니다.");
+    connectDB("chatData")
+        .then(_ => mongoose.connection.db.dropCollection(req.params.roomId))
+        .then(_ => mongoose.connection.close())
+        .then(_ => res.end());
 })
 
 app.get('/backup/:roomId', (req, res) => {
